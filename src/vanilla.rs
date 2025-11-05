@@ -52,7 +52,7 @@ pub async fn get_manifest() -> VanillaManifest {
     serde_json::from_str(&manifest_txt).unwrap()
 }
 
-pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String) {
+pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: String) {
     let game_dir = version_dir
         .parent()
         .unwrap()
@@ -166,7 +166,8 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String) {
     let game_args_resolved: Vec<String> = game_args
         .into_iter()
         .map(|arg| {
-            arg.replace("${auth_player_name}", "qwerty")
+            arg.replace("${auth_player_name}", &username)
+                .replace("${player_name}", &username)
                 .replace(
                     "${version_name}",
                     version_dir.file_name().unwrap().to_str().unwrap(),
@@ -176,7 +177,7 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String) {
                 .replace("${auth_access_token}", "")
                 .replace("${clientid}", &Uuid::new_v4().to_string())
                 .replace("${auth_xuid}", "0")
-                .replace("${user_type}", "offline")
+                .replace("${user_type}", "legacy")
                 .replace("${version_type}", &json.r#type)
                 .replace("${user_properties}", "{}")
                 .replace(
@@ -222,7 +223,7 @@ pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
     let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
 }
 
-pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>) {
+pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String) {
     mem::check_if_valid(limit.clone());
 
     let manifest = get_manifest().await;
@@ -252,7 +253,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
             };
 
             if b_launch {
-                launch(version_json, ver.to_path_buf(), limit.clone());
+                launch(version_json, ver.to_path_buf(), limit.clone(), username);
             }
 
             return;
@@ -408,6 +409,6 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
     futures_util::future::join_all(download_futures).await;
 
     if b_launch {
-        launch(version_json, ver.to_path_buf(), limit.clone());
+        launch(version_json, ver.to_path_buf(), limit.clone(), username);
     }
 }

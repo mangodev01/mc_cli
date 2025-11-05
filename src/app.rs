@@ -12,34 +12,54 @@ pub enum Subcommand {
     Vanilla {
         #[clap(short, long)]
         version: Option<String>,
+
         #[clap(short, long, default_value = "10G")]
         mem: String,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
     },
     Fabric {
         #[clap(short, long)]
         version: Option<String>,
+
         #[clap(short, long)]
         loader_version: Option<String>,
+
         #[clap(short, long, default_value = "10G")]
         mem: String,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
     },
     Quilt {
         #[clap(short, long)]
         version: Option<String>,
+
         #[clap(short, long)]
         loader_version: Option<String>,
+
         #[clap(short, long, default_value = "10G")]
         mem: String,
+
         #[clap(short, long, default_value = "false")]
         use_release: bool,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
     },
     Liteloader {
         #[clap(short, long)]
         version: Option<String>,
+
         #[clap(short, long)]
         loader_version: Option<String>,
+
         #[clap(short, long, default_value = "10G")]
         mem: String,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
     },
     #[command(about = "List versions")]
     Versions,

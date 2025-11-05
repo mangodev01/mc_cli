@@ -12,73 +12,67 @@ mod liteloader;
 use app::OpenTarget;
 use clap::Parser;
 use cli_table::{Cell as _, Table};
+use directories::ProjectDirs;
 use version::UseQuilt;
+
+use crate::app::Subcommand;
 
 #[tokio::main]
 async fn main() {
     let app = app::App::parse();
+    let dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
+    let game_dir = dirs.data_dir().join("game");
 
     match app.command {
-        app::Subcommand::Vanilla { version, mem } => {
-            vanilla::handle(version, mem, true, None).await;
+        Subcommand::Vanilla { version, mem, username } => {
+            vanilla::handle(version, mem, true, None, username).await;
         },
-        app::Subcommand::Fabric { version, loader_version, mem } => {
-            fabric::handle(version, loader_version, mem, UseQuilt::No).await;
+        Subcommand::Fabric { version, loader_version, mem, username } => {
+            fabric::handle(version, loader_version, mem, UseQuilt::No, username).await;
         },
-        app::Subcommand::Quilt { version, loader_version, mem, use_release } => {
-            fabric::handle(version, loader_version, mem, UseQuilt::Yes(use_release)).await;
+        Subcommand::Quilt { version, loader_version, mem, use_release, username } => {
+            fabric::handle(version, loader_version, mem, UseQuilt::Yes(use_release), username).await;
         },
-        app::Subcommand::Liteloader { version, loader_version, mem } => {
+        Subcommand::Liteloader { version, loader_version, mem, username } => {
             eprintln!("Liteloader isn't implemented yet. Please consider using fabric,quilt,or just running vanilla");
-            liteloader::handle(version, loader_version, mem).await;
+            liteloader::handle(version, loader_version, mem, username).await;
         },
-        app::Subcommand::Open { target: OpenTarget::Game } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game");
+        Subcommand::Open { target: OpenTarget::Game } => {
+            open::that(game_dir).unwrap();
+        },
+        Subcommand::Open { target: OpenTarget::Mods } => {
+            let path = game_dir.join("mods");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Mods } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("mods");
+        Subcommand::Open { target: OpenTarget::ResourcePacks } => {
+            let path = game_dir.join("resourcepacks");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::ResourcePacks } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("resourcepacks");
+        Subcommand::Open { target: OpenTarget::Saves } => {
+            let path = game_dir.join("saves");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Saves } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("saves");
+        Subcommand::Open { target: OpenTarget::Logs } => {
+            let path = game_dir.join("logs");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Logs } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("logs");
+        Subcommand::Open { target: OpenTarget::Downloads } => {
+            let path = game_dir.join("downloads");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Downloads } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("downloads");
+        Subcommand::Open { target: OpenTarget::Data } => {
+            let path = game_dir.join("data");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Data } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("data");
+        Subcommand::Open { target: OpenTarget::Config } => {
+            let path = game_dir.join("config");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::Config } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("config");
+        Subcommand::Open { target: OpenTarget::McOptions } => {
+            let path = game_dir.join("options.txt");
             open::that(path).unwrap();
         },
-        app::Subcommand::Open { target: OpenTarget::McOptions } => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-            let path = dirs.data_dir().join("game").join("options.txt");
-            open::that(path).unwrap();
-        },
-        app::Subcommand::Versions => {
-            let dirs = directories::ProjectDirs::from("me", "illia", "mc_cli").unwrap();
+        Subcommand::Versions => {
             let path = dirs.data_dir().join("vers");
 
             println!("Installed versions:");

@@ -128,7 +128,7 @@ pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
     let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
 }
 
-pub fn launch(ver_dir: PathBuf, main_class: String) {
+pub fn launch(ver_dir: PathBuf, main_class: String, username: String) {
     println!("Launching minecraft client...");
     let main_class = dbg!(main_class);
     let game_dir = ver_dir.join("game");
@@ -169,6 +169,9 @@ pub fn launch(ver_dir: PathBuf, main_class: String) {
     cmd.push("--uuid".to_string());
     cmd.push(Uuid::new_v4().to_string());
 
+    cmd.push("--username".to_string());
+    cmd.push(username);
+
     let mut process = Command::new("java")
         .current_dir(game_dir)
         .args(&cmd)
@@ -187,7 +190,7 @@ pub fn launch(ver_dir: PathBuf, main_class: String) {
     println!("Exited with {}", status);
 }
 
-pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<String>, limit: String, use_quilt: UseQuilt) {
+pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<String>, limit: String, use_quilt: UseQuilt, username: String) {
     let is_quilt = matches!(use_quilt, UseQuilt::Yes(_));
     let use_release = match use_quilt {
         UseQuilt::Yes(value) => if value { "repository/release/" } else { "repository/snapshot/" },
@@ -224,7 +227,7 @@ pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<Stri
         std::process::exit(-1);
     }
 
-    println!("Launching fabric {}-{} build {} with memory limit {}", ver.version, loader_version, loader_build, limit);
+    println!("Launching fabric {}-{} build {} with memory limit {} and username {}", ver.version, loader_version, loader_build, limit, username);
 
     let proj_dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
     let data_dir = proj_dirs.data_dir();
@@ -233,7 +236,7 @@ pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<Stri
 
     create_dirs(vers, ver_path.clone());
 
-    vanilla::handle(Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path())).await;
+    vanilla::handle(Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path()), username.clone()).await;
     let parsed_json = down(loader, &ver, ver_path.clone(), use_quilt).await;
 
     let _ = fs::remove_dir_all(ver_path.join("libs").join("META-INF"));
@@ -268,5 +271,5 @@ pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<Stri
         println!("No numeric-named directories found.");
     }
 
-    launch(ver_path, parsed_json.mainClass.client);
+    launch(ver_path, parsed_json.mainClass.client, username);
 }

@@ -6,7 +6,7 @@ use crate::{util, vanilla, version::{LiteLoaderVersions, MavenMetadataRoot}};
 
 const LITELOADER_VERSIONS_JSON: &'static str = "https://dl.liteloader.com/versions/versions.json";
 
-pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<String>, limit: String) {
+pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<String>, limit: String, username: String) {
     let versions_json_text = util::download_text_no_save_async(LITELOADER_VERSIONS_JSON, "Downloaded liteloader versions json".to_owned()).await.expect("Failed to download liteloader versions json");
     tokio::fs::write("ver.json", versions_json_text.to_string()).await.unwrap();
     let versions_json: LiteLoaderVersions = serde_json::from_str(&versions_json_text).expect("Failed to parse liteloader versions");
@@ -51,7 +51,7 @@ pub async fn handle(opt_version: Option<String>, opt_loader_version: Option<Stri
         let ll = util::download_async(ll_path.as_str(), &ll_jar_path.as_path(), "Downloaded ll jar".to_string()).await.expect("Failed to download ll jar");
     }
 
-    vanilla::handle(Some(version), limit.clone(), false, Some(ver_path.as_path())).await;
+    vanilla::handle(Some(version), limit.clone(), false, Some(ver_path.as_path()), username).await;
 }
 
 pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
