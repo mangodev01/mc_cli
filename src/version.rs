@@ -225,6 +225,7 @@ pub enum UseQuilt {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 pub struct LiteLoaderMeta {
     pub description: String,
     pub authors: String,
@@ -242,6 +243,7 @@ pub struct LiteLoaderRepo {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 pub struct LiteLoaderTweaks {
     pub tweakClass: String,
     pub libraries: Vec<LiteLoaderLibrary>,
@@ -275,6 +277,7 @@ pub struct LiteLoaderVersion {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 pub struct LiteLoaderArtifacts {
     pub tweakClass: String,
     pub libraries: Vec<LiteLoaderLibrary>,
@@ -298,6 +301,7 @@ pub struct LiteLoaderVersions {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(non_snake_case)]
 pub struct MavenMetadataVersioning {
     pub snapshot: MavenMetadataSnapshot,
     pub lastUpdated: String,

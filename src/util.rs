@@ -1,14 +1,14 @@
 use std::{error::Error, fs::{self, File}, io::{Read, Write}, path::{Path, PathBuf}};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use futures_util::StreamExt as _;
 
-pub fn download_text(url: &str, out: &Path, msg: String) -> Result<String, Box<dyn Error>> {
+pub fn download_text(mp: &MultiProgress, url: &str, out: &Path, msg: String) -> Result<String, Box<dyn Error>> {
     let client = Client::new();
     let mut resp = client.get(url).send()?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -32,12 +32,12 @@ pub fn download_text(url: &str, out: &Path, msg: String) -> Result<String, Box<d
     Ok(String::from_utf8(downloaded)?) // now return the full text
 }
 
-pub async fn download_text_async(url: &str, out: &Path, msg: String) -> Result<String, Box<dyn Error>> {
+pub async fn download_text_async(mp: &MultiProgress, url: &str, out: &Path, msg: String) -> Result<String, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let resp = client.get(url).send().await?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -58,12 +58,12 @@ pub async fn download_text_async(url: &str, out: &Path, msg: String) -> Result<S
     Ok(String::from_utf8(data)?) // now return the full text
 }
 
-pub fn download_text_no_save(url: &str, msg: String) -> Result<String, Box<dyn Error>> {
+pub fn download_text_no_save(mp: &MultiProgress, url: &str, msg: String) -> Result<String, Box<dyn Error>> {
     let client = Client::new();
     let mut resp = client.get(url).send()?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -85,12 +85,12 @@ pub fn download_text_no_save(url: &str, msg: String) -> Result<String, Box<dyn E
     Ok(String::from_utf8(downloaded)?) // now return the full text
 }
 
-pub async fn download_text_no_save_async(url: &str, msg: String) -> Result<String, Box<dyn Error>> {
+pub async fn download_text_no_save_async(mp: &MultiProgress, url: &str, msg: String) -> Result<String, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let resp = client.get(url).send().await?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -109,12 +109,12 @@ pub async fn download_text_no_save_async(url: &str, msg: String) -> Result<Strin
     Ok(String::from_utf8(data)?) // now return the full text
 }
 
-pub fn download(url: &str, out: &Path, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn download(mp: &MultiProgress, url: &str, out: &Path, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
     let client = Client::new();
     let mut resp = client.get(url).send()?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -138,12 +138,12 @@ pub fn download(url: &str, out: &Path, msg: String) -> Result<Vec<u8>, Box<dyn E
     Ok(downloaded)
 }
 
-pub async fn download_async(url: &str, out: &Path, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
+pub async fn download_async(mp: &MultiProgress, url: &str, out: &Path, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let resp = client.get(url).send().await?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -165,12 +165,12 @@ pub async fn download_async(url: &str, out: &Path, msg: String) -> Result<Vec<u8
 }
 
 
-pub fn download_no_save(url: &str, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
+pub fn download_no_save(mp: &MultiProgress, url: &str, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
     let client = Client::new();
     let mut resp = client.get(url).send()?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()
@@ -192,12 +192,12 @@ pub fn download_no_save(url: &str, msg: String) -> Result<Vec<u8>, Box<dyn Error
     Ok(downloaded)
 }
 
-pub async fn download_no_save_async(url: &str, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
+pub async fn download_no_save_async(mp: &MultiProgress, url: &str, msg: String) -> Result<Vec<u8>, Box<dyn Error>> {
     let client = reqwest::Client::new();
     let resp = client.get(url).send().await?;
 
     let total = resp.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total);
+    let pb = mp.add(ProgressBar::new(total));
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta}) {msg}")
         .unwrap()

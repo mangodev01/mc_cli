@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io::{BufRead, BufReader}, path::{Path, PathBuf}, process::{Command, Stdio}, sync::Arc};
-
 use directories::ProjectDirs;
+use indicatif::MultiProgress;
 use jars::JarOptionBuilder;
 use serde::Deserialize;
 use tokio::sync::Semaphore;
@@ -47,8 +47,8 @@ pub fn get_ver_json_url(manifest: VanillaManifest, version: String) -> String {
     url
 }
 
-pub async fn get_manifest() -> VanillaManifest {
-    let manifest_txt = util::download_text_no_save_async(VANILLA_MANIFEST, "Downloaded vanilla manifest".to_owned()).await.expect("Failed to download vanilla manifest to RAM");
+pub async fn get_manifest(mp: &MultiProgress) -> VanillaManifest {
+    let manifest_txt = util::download_text_no_save_async(mp, VANILLA_MANIFEST, "Downloaded vanilla manifest".to_owned()).await.expect("Failed to download vanilla manifest to RAM");
     serde_json::from_str(&manifest_txt).unwrap()
 }
 
@@ -223,10 +223,10 @@ pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
     let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
 }
 
-pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String) {
+pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String) {
     mem::check_if_valid(limit.clone());
 
-    let manifest = get_manifest().await;
+    let manifest = get_manifest(mp).await;
     let version = opt_version.unwrap_or(manifest.latest.snapshot.clone());
 
     let proj_dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
@@ -264,7 +264,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
 
     let ver_url = get_ver_json_url(manifest, version.clone());
 
-    let text = util::download_text_async(ver_url.as_str(), ver.join("version.json").as_path(), "Downloaded version.json".to_owned()).await.expect("Failed to download version json");
+    let text = util::download_text_async(mp, ver_url.as_str(), ver.join("version.json").as_path(), "Downloaded version.json".to_owned()).await.expect("Failed to download version json");
 
     let mut version_json_err = serde_json::Deserializer::from_str(text.as_str());
     let version_json_res = serde_path_to_error::deserialize::<_, VersionJson>(&mut version_json_err);
@@ -275,7 +275,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
 
     // download minecraft jar
     let client_url = version_json.downloads.client.url.clone();
-    let _ = util::download_async(client_url.as_str(), ver.join("client.jar").as_path(), "Downloaded client jar".to_owned()).await.expect("Failed to download client jar");
+    let _ = util::download_async(mp, client_url.as_str(), ver.join("client.jar").as_path(), "Downloaded client jar".to_owned()).await.expect("Failed to download client jar");
     let lib_semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_DOWNLOADS as usize));
 
     let mut download_tasks = Vec::new();
@@ -294,6 +294,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
             let download_path = libs.join(path);
             let url = artifact.url.clone();
             let sem = Arc::clone(&lib_semaphore);
+            let mp_clone = mp.clone();
 
             tokio::fs::create_dir_all(&dir_path).await.unwrap_or_default();
 
@@ -301,6 +302,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
                 let _permit = sem.acquire().await.unwrap();
 
                 util::download_async(
+                    &mp_clone,
                     &url, 
                     &download_path, 
                     "Downloaded lib".to_owned()
@@ -318,11 +320,13 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
                 let url = needed_classifier.url.clone();
                 let libs_clone = libs.to_path_buf();
                 let extract = lib.extract.clone();
+                let mp_clone = mp.clone();
 
                 tokio::fs::create_dir_all(&dir_path).await.unwrap_or_default();
 
                 download_tasks.push(tokio::spawn(async move {
                     let classifier_lib = util::download_async(
+                        &mp_clone,
                         &url,
                         &download_path,
                         "Downloaded classifier lib".to_owned()
@@ -364,7 +368,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
     let _ = fs::create_dir(assets_dir.join("indexes"));
 
     let asset_index_url = version_json.assetIndex.url.clone();
-    let asset_index = util::download_text_async(&asset_index_url, &assets_dir.join("indexes").join(format!("{}.json", version)), "Downloaded asset index".to_owned()).await.expect("Failed to download asset index json");
+    let asset_index = util::download_text_async(mp, &asset_index_url, &assets_dir.join("indexes").join(format!("{}.json", version)), "Downloaded asset index".to_owned()).await.expect("Failed to download asset index json");
 
     let asset_index_json: AssetIndexJson = serde_json::from_str(&asset_index).expect("Failed to parse asset index json");
     let assets = asset_index_json.objects;
@@ -375,6 +379,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
         let hash = asset.1.hash.clone();
         let assets_dir = assets_dir.clone();
         let sem = Arc::clone(&semaphore);
+        let mp_clone = mp.clone();
 
         async move {
             let _permit = sem.acquire().await.unwrap();
@@ -388,7 +393,7 @@ pub async fn handle(opt_version: Option<String>, limit: String, b_launch: bool, 
 
             match tokio::time::timeout(
                 tokio::time::Duration::from_secs(60),
-                util::download_async(&url, &destination, "Downloaded resource".to_owned())
+                util::download_async(&mp_clone, &url, &destination, "Downloaded resource".to_owned())
             ).await {
                 Ok(Ok(_)) => {
                     println!("Successfully downloaded resource {}", hash);

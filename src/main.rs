@@ -13,6 +13,7 @@ use app::OpenTarget;
 use clap::Parser;
 use cli_table::{Cell as _, Table};
 use directories::ProjectDirs;
+use indicatif::MultiProgress;
 use version::UseQuilt;
 
 use crate::app::Subcommand;
@@ -22,20 +23,21 @@ async fn main() {
     let app = app::App::parse();
     let dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
     let game_dir = dirs.data_dir().join("game");
+    let mp = MultiProgress::new();
 
     match app.command {
         Subcommand::Vanilla { version, mem, username } => {
-            vanilla::handle(version, mem, true, None, username).await;
+            vanilla::handle(&mp, version, mem, true, None, username).await;
         },
         Subcommand::Fabric { version, loader_version, mem, username } => {
-            fabric::handle(version, loader_version, mem, UseQuilt::No, username).await;
+            fabric::handle(&mp, version, loader_version, mem, UseQuilt::No, username).await;
         },
         Subcommand::Quilt { version, loader_version, mem, use_release, username } => {
-            fabric::handle(version, loader_version, mem, UseQuilt::Yes(use_release), username).await;
+            fabric::handle(&mp, version, loader_version, mem, UseQuilt::Yes(use_release), username).await;
         },
         Subcommand::Liteloader { version, loader_version, mem, username } => {
             eprintln!("Liteloader isn't implemented yet. Please consider using fabric,quilt,or just running vanilla");
-            liteloader::handle(version, loader_version, mem, username).await;
+            liteloader::handle(&mp, version, loader_version, mem, username).await;
         },
         Subcommand::Open { target: OpenTarget::Game } => {
             open::that(game_dir).unwrap();
