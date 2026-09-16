@@ -2,22 +2,13 @@ use std::fs;
 use std::io::{BufRead as _, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use directories::ProjectDirs;
 use indicatif::MultiProgress;
 use uuid::Uuid;
+use crate::loaders::{BABRIC, FABRIC, LABRIC, ORNITHE, QUILT};
 
+use crate::util::LauncherDirs;
 use crate::{mem, util, vanilla, version};
-use crate::version::{FabricIntermediaryVersion, FabricLoaderJSON, FabricLoaderVersion, FabricVersion, UseQuilt};
-
-const FABRIC_GAME_VERSIONS: &'static str = "https://meta.fabricmc.net/v2/versions/game";
-const FABRIC_LOADER_VERSIONS: &'static str = "https://meta.fabricmc.net/v2/versions/loader";
-const FABRIC_INTERMEDIARY_VERSIONS: &'static str = "https://meta.fabricmc.net/v2/versions/intermediary";
-const FABRIC_MAVEN: &'static str = "https://maven.fabricmc.net/";
-
-const QUILT_GAME_VERSIONS: &'static str = "https://meta.quiltmc.org/v3/versions/game";
-const QUILT_LOADER_VERSIONS: &'static str = "https://meta.quiltmc.org/v3/versions/loader";
-const QUILT_INTERMEDIARY_VERSIONS: &'static str = "https://meta.quiltmc.org/v3/versions/intermediary";
-const QUILT_MAVEN: &'static str = "https://maven.quiltmc.org/";
+use crate::version::{FabricIntermediaryVersion, FabricLoaderJSON, FabricLoaderVersion, FabricVersion, FabricBase};
 
 pub fn get_ver(versions: Vec<FabricVersion>, version: String) -> FabricVersion {
     let mut found = false;
@@ -33,18 +24,30 @@ pub fn get_ver(versions: Vec<FabricVersion>, version: String) -> FabricVersion {
     ver.clone()
 }
 
-pub async fn down_intermediary(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &FabricVersion, ver: PathBuf, use_quilt: UseQuilt) {
-    let is_quilt = matches!(use_quilt, UseQuilt::Yes(_));
+pub async fn down_intermediary(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &FabricVersion, ver: PathBuf, use_quilt: FabricBase) {
+    let is_quilt = matches!(use_quilt, FabricBase::Quilt(_));
     let use_release = match use_quilt {
-        UseQuilt::Yes(value) => if value { "repository/release/" } else { "repository/snapshot/" },
-        UseQuilt::No => "",
+        FabricBase::Quilt(value) => if value { "repository/release/" } else { "repository/snapshot/" },
+        FabricBase::Fabric | FabricBase::Labric => "",
+		FabricBase::Babric => "releases/",
+		FabricBase::Ornithe => "releases/"
     };
-    let intermediary_versions_text = util::download_text_no_save_async(mp, if is_quilt { QUILT_INTERMEDIARY_VERSIONS } else { FABRIC_INTERMEDIARY_VERSIONS }, "Downloaded intermediary version JSON".to_string()).await.expect("Failed to download intermediary version JSON");
+
+	let loader = match use_quilt {
+		FabricBase::Quilt(_) => QUILT,
+		FabricBase::Fabric => FABRIC,
+		FabricBase::Labric => LABRIC,
+		FabricBase::Babric => BABRIC,
+		FabricBase::Ornithe => ORNITHE,
+	};
+
+    let intermediary_versions_text = util::download_text_no_save_async(mp, loader.intermediary_versions, "Downloaded intermediary version JSON".to_string()).await.expect("Failed to download intermediary version JSON");
     let intermediaries: Vec<FabricIntermediaryVersion> = serde_json::from_str(intermediary_versions_text.as_str()).expect("Failed to deserialize intermediary version JSON");
     let mut intermediary: &FabricIntermediaryVersion = &FabricIntermediaryVersion {
         maven: "".to_string(),
         version: "".to_string(),
     };
+
     intermediaries.iter().any(|i| {
         if i.version == version.version {
             intermediary = i;
@@ -54,7 +57,7 @@ pub async fn down_intermediary(mp: &MultiProgress, loader: &FabricLoaderVersion,
     });
 
     let maven_path = version::maven_to_path(intermediary.maven.clone());
-    let maven_path_with_domain = format!("{}{}", FABRIC_MAVEN.to_string(), maven_path);
+    let maven_path_with_domain = format!("{}{}{}", loader.maven.to_string(), use_release, maven_path);
     dbg!(&maven_path_with_domain);
     let _ = util::download_async(mp, maven_path_with_domain.as_str(), ver.join("inter.jar").as_ref(), "Downloaded intermediary...".to_string()).await.expect("Failed to download intermediary");
 }
@@ -63,23 +66,43 @@ pub async fn down_intermediary(mp: &MultiProgress, loader: &FabricLoaderVersion,
 /// {loader} the loader version
 /// {version} the minecarft version
 /// {ver} the version dir
-pub async fn down(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &FabricVersion, ver: PathBuf, use_quilt: UseQuilt) -> FabricLoaderJSON {
-    let is_quilt = matches!(use_quilt, UseQuilt::Yes(_));
+pub async fn down(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &FabricVersion, ver: PathBuf, use_quilt: FabricBase) -> FabricLoaderJSON {
+    let is_quilt = matches!(use_quilt, FabricBase::Quilt(_));
     let use_release = match use_quilt {
-        UseQuilt::Yes(value) => if value { "repository/release/" } else { "repository/snapshot/" },
-        UseQuilt::No => "",
+        FabricBase::Quilt(value) => if value { "repository/release/" } else { "repository/snapshot/" },
+        FabricBase::Fabric | FabricBase::Labric | FabricBase::Babric | FabricBase::Ornithe => "",
     };
 
+	let loader_consts = match use_quilt {
+		FabricBase::Quilt(_) => QUILT,
+		FabricBase::Fabric => FABRIC,
+		FabricBase::Labric => LABRIC,
+		FabricBase::Babric => BABRIC,
+		FabricBase::Ornithe => ORNITHE,
+	};
+
     down_intermediary(mp, loader, version, ver.clone(), use_quilt).await;
-    let loader_jar_url = format!("{}{}{}", if is_quilt { QUILT_MAVEN } else { FABRIC_MAVEN }, use_release, loader.jar_path(is_quilt));
+    let loader_jar_url = format!("{}{}{}", if loader_consts.id == LABRIC.id || loader_consts.id == BABRIC.id || loader_consts.id == ORNITHE.id { FABRIC.maven } else { loader_consts.maven }, use_release, loader.jar_path(loader_consts));
 
     let jar_path = ver.join("fabric.jar");
 
     if !jar_path.exists() {
+		println!("{:#?}", loader_jar_url);
         let _ = util::download_async(mp, &loader_jar_url, jar_path.as_path(), "Downloaded fabric loader jar".to_string()).await.expect("Failed to download fabric JAR");
     }
 
-    let loader_json_url = format!("{}{}{}", if is_quilt { QUILT_MAVEN } else { FABRIC_MAVEN }, use_release, loader.json_path(is_quilt));
+    let loader_json_url = format!("{}{}{}", 
+		if loader_consts.id == LABRIC.id ||
+		   loader_consts.id == BABRIC.id ||
+		   loader_consts.id == ORNITHE.id {
+			FABRIC.maven 
+		} else { 
+			loader_consts.maven 
+		}, 
+		use_release,
+		loader.json_path(loader_consts)
+	);
+	dbg!(&loader_json_url);
 
 
     let json_path = ver.join("fabric.json");
@@ -90,6 +113,8 @@ pub async fn down(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &Fa
         fs::read_to_string(json_path.as_path()).unwrap()
     };
 
+    println!("{:#?}", loader_json);
+
     let parsed_json: FabricLoaderJSON = serde_json::from_str(&loader_json).expect("Failed to parse loader JSON");
 
     for lib in &parsed_json.libraries.common {
@@ -99,7 +124,9 @@ pub async fn down(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &Fa
         let _ = fs::create_dir_all(lib_path.clone().parent().unwrap());
         let _ = util::download_async(mp, path.as_str(), &lib_path, "Downloaded common lib jar".to_owned()).await.expect("Failed to download server lib jar");
     }
+
     println!("Downloaded common libs...");
+
     for lib in &parsed_json.libraries.server {
         let path_from_maven = version::maven_to_path(lib.name.clone());
         let path = format!("{}{}", lib.url, path_from_maven);
@@ -107,7 +134,9 @@ pub async fn down(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &Fa
         let _ = fs::create_dir_all(lib_path.clone().parent().unwrap());
         let _ = util::download_async(mp, path.as_str(), &lib_path, "Downloaded server lib jar".to_owned()).await.expect("Failed ot download server lib jar");
     }
+
     println!("Downloaded server libs...");
+
     for lib in &parsed_json.libraries.client {
         let path_from_maven = version::maven_to_path(lib.name.clone());
         let path = format!("{}{}", lib.url, path_from_maven);
@@ -136,6 +165,9 @@ pub fn launch(ver_dir: PathBuf, main_class: String, username: String) {
 
     let mut classpath: String = "".to_owned();
     let libs = util::list_files_recursively(&ver_dir.join("libs"));
+    let libs = libs.iter().filter(|p| {
+        matches!(p.extension().and_then(|e| e.to_str()), Some("jar" | "zip"))
+    });
     let sep = if cfg!(target_os = "windows") { ';' } else { ':' };
 
     for lib in libs {
@@ -190,13 +222,24 @@ pub fn launch(ver_dir: PathBuf, main_class: String, username: String) {
     println!("Exited with {}", status);
 }
 
-pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, opt_loader_version: Option<String>, limit: String, use_quilt: UseQuilt, username: String) {
-    let is_quilt = matches!(use_quilt, UseQuilt::Yes(_));
+pub async fn handle(dirs: LauncherDirs, mp: &MultiProgress, opt_version: Option<String>, opt_loader_version: Option<String>, limit: String, use_quilt: FabricBase, username: String, javaagent: bool) {
+    let is_quilt = matches!(use_quilt, FabricBase::Quilt(_));
     let use_release = match use_quilt {
-        UseQuilt::Yes(value) => if value { "repository/release/" } else { "repository/snapshot/" },
-        UseQuilt::No => "",
+        FabricBase::Quilt(value) => if value { "repository/release/" } else { "repository/snapshot/" },
+        FabricBase::Fabric | FabricBase::Labric => "",
+		FabricBase::Babric | FabricBase::Ornithe => "releases/"
     };
-    let game_versions = util::download_text_no_save_async(mp, if is_quilt { QUILT_GAME_VERSIONS } else { FABRIC_GAME_VERSIONS }, "Downloaded fabric game versions json".to_string()).await.expect("Failed to download fabric game versions json");
+
+	let loader_consts = match use_quilt {
+		FabricBase::Quilt(_) => QUILT,
+		FabricBase::Fabric => FABRIC,
+		FabricBase::Labric => LABRIC,
+		FabricBase::Babric => BABRIC,
+		FabricBase::Ornithe => ORNITHE,
+	};
+
+
+    let game_versions = util::download_text_no_save_async(mp, loader_consts.game_versions, "Downloaded fabric game versions json".to_string()).await.expect("Failed to download fabric game versions json");
     let versions: Vec<FabricVersion> = serde_json::from_str(game_versions.as_str()).expect("Failed to parse fabric game versions JSON");
     let ver = if opt_version.is_some() {
         get_ver(versions, opt_version.unwrap())
@@ -204,7 +247,7 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, opt_loader_
         versions.first().unwrap().clone()
     };
 
-    let loader_versions_json = util::download_text_no_save_async(mp, if is_quilt { QUILT_LOADER_VERSIONS } else { FABRIC_LOADER_VERSIONS }, "".to_string()).await.expect("Failed to download loader versions JSON");
+    let loader_versions_json = util::download_text_no_save_async(mp, loader_consts.loader_versions, "".to_string()).await.expect("Failed to download loader versions JSON");
     let loader_versions: Vec<FabricLoaderVersion> = serde_json::from_str(&loader_versions_json).expect("Failed to parse fabric loader versions JSON");
     let loader = if let Some(ver_str) = opt_loader_version {
         &loader_versions
@@ -227,49 +270,50 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, opt_loader_
         std::process::exit(-1);
     }
 
-    println!("Launching fabric {}-{} build {} with memory limit {} and username {}", ver.version, loader_version, loader_build, limit, username);
+    println!("Launching {} {}-{} build {} with memory limit {} and username {}", loader_consts.id, ver.version, loader_version, loader_build, limit, username);
 
-    let proj_dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-    let data_dir = proj_dirs.data_dir();
-    let vers = data_dir.join("vers");
-    let ver_path = vers.join(format!("{}-{}", if is_quilt { "quilt" } else { "fabric" }, ver.version.clone()));
+	let vers = dirs.vers_dir;
+    let ver_path = vers.join(format!("{}-{}", loader_consts.id, ver.version.clone()));
 
     create_dirs(vers, ver_path.clone());
 
-    vanilla::handle(mp, Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path()), username.clone()).await;
-    let parsed_json = down(mp, loader, &ver, ver_path.clone(), use_quilt).await;
+    vanilla::handle(mp, Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path()), username.clone(), javaagent).await;
+    let parsed_json = down(mp, loader, &ver, ver_path.clone(), use_quilt.clone()).await;
 
     let _ = fs::remove_dir_all(ver_path.join("libs").join("META-INF"));
+    let _ = fs::remove_dir_all(ver_path.join("libs").join("org").join("ow2").join("asm").join("asm-all"));
 
     let asm = ver_path.join("libs").join("org").join("ow2").join("asm").join("asm");
     let entries = fs::read_dir(&asm).expect("Failed to read lib dir").filter_map(|e| e.ok()).filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false));
 
 
-    let mut min_dir: Option<(f64, String)> = None;
-    let mut len = 0;
-    for entry in entries {
-        len += 1;
-        let name = entry.file_name().into_string().unwrap_or_default();
-        if let Ok(num) = name.parse::<f64>() {
-            match min_dir {
-                Some((min_val, _)) if num < min_val => {
-                    min_dir = Some((num, name));
-                }
-                None => {
-                    min_dir = Some((num, name));
-                }
-                _ => {}
-            }
-        }
-    }
+	if !matches!(use_quilt, FabricBase::Babric) {
+		let mut min_dir: Option<(f64, String)> = None;
+		let mut len = 0;
+		for entry in entries {
+			len += 1;
+			let name = entry.file_name().into_string().unwrap_or_default();
+			if let Ok(num) = name.parse::<f64>() {
+				match min_dir {
+					Some((min_val, _)) if num < min_val => {
+						min_dir = Some((num, name));
+					}
+					None => {
+						min_dir = Some((num, name));
+					}
+					_ => {}
+				}
+			}
+		}
 
-    if let Some((_, dir_name)) = min_dir {
-        if len > 1 {
-            let _ = fs::remove_dir_all(asm.join(Path::new(&dir_name)));
-        }
-    } else {
-        println!("No numeric-named directories found.");
-    }
+		if let Some((_, dir_name)) = min_dir {
+			if len > 1 {
+				let _ = fs::remove_dir_all(asm.join(Path::new(&dir_name)));
+			}
+		} else {
+			println!("No numeric-named directories found.");
+		}
+	}
 
-    launch(ver_path, parsed_json.mainClass.client, username);
+	launch(ver_path, parsed_json.mainClass.client, username);
 }

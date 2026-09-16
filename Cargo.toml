@@ -1,5 +1,5 @@
 [package]
-name = "mc_cli"
+name = "mc-cli"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,7 +10,6 @@ directories = "6.0.0"
 futures-util = "0.3.31"
 indicatif = "0.17.11"
 jars = "0.1.1"
-oauth2-microsoft = "0.2.0"
 open = "5.3.2"
 regex = "1.11.1"
 reqwest = { version = "0.12.15", features = ["blocking", "stream"] }

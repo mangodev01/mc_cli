@@ -45,6 +45,15 @@ pub struct LibraryClassifiers {
     pub natives_linux_64: Option<LibraryDownload>,
 }
 
+#[derive(Clone, Copy)]
+pub struct FabricLike<'a> {
+	pub game_versions: &'a str,
+	pub loader_versions: &'a str,
+	pub intermediary_versions: &'a str,
+	pub maven: &'a str,
+	pub id: &'a str
+}
+
 #[derive(Deserialize, Debug)]
 pub struct LibraryDownloads {
     pub artifact: Option<LibraryDownload>,
@@ -182,11 +191,21 @@ impl FabricLoaderVersion {
     pub fn replace(&self) -> String {
         format!("{}{}", self.maven.replace(&self.version, "").replace(self.separator.as_str(), "/").replace(".", "/").replace(":", "/"), self.version)
     }
-    pub fn jar_path(&self, is_quilt: bool) -> String {
-        format!("{}/{}-loader-{}.jar", self.replace(), if is_quilt { "quilt" } else { "fabric" }, self.version)
+    pub fn jar_path(&self, loader: FabricLike) -> String {
+        if loader.id == "labric" || loader.id == "babric" || loader.id == "ornithe" {
+            // use same loader json for legacy fabric
+            format!("{}/fabric-loader-{}.jar", self.replace(), self.version)
+        } else {
+            format!("{}/{}-loader-{}.json", self.replace(), loader.id, self.version)
+        }
     }
-    pub fn json_path(&self, is_quilt: bool) -> String {
-        format!("{}/{}-loader-{}.json", self.replace(), if is_quilt { "quilt" } else { "fabric" }, self.version)
+    pub fn json_path(&self, loader: FabricLike) -> String {
+        if loader.id == "labric" || loader.id == "babric" || loader.id == "ornithe" {
+            // use same loader json for legacy fabric
+            format!("{}/fabric-loader-{}.json", self.replace(), self.version)
+		} else {
+            format!("{}/{}-loader-{}.json", self.replace(), loader.id, self.version)
+        }
     }
 }
 
@@ -219,9 +238,13 @@ pub struct FabricIntermediaryVersion {
     pub version: String,
 }
 
-pub enum UseQuilt {
-    Yes(bool),
-    No
+#[derive(Clone)]
+pub enum FabricBase {
+    Quilt(bool),
+    Fabric,
+	Labric,
+	Babric,
+	Ornithe
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -18,6 +18,15 @@ pub enum Subcommand {
         #[clap(short, long, default_value = "Player")]
         username: String,
     },
+	Javaagent {
+        version: Option<String>,
+
+        #[clap(short, long, default_value = "10G")]
+        mem: String,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
+	},
     Fabric {
         version: Option<String>,
 
@@ -30,6 +39,40 @@ pub enum Subcommand {
         #[clap(short, long, default_value = "Player")]
         username: String,
     },
+	Labric {
+		version: Option<String>,
+
+		#[clap(short, long)]
+		loader_version: Option<String>,
+
+		#[clap(short, long, default_value = "10G")]
+		mem: String,
+
+		#[clap(short, long, default_value = "Player")]
+		username: String,
+	},
+	Babric {
+		#[clap(short, long)]
+		loader_version: Option<String>,
+
+		#[clap(short, long, default_value = "10G")]
+		mem: String,
+
+		#[clap(short, long, default_value = "Player")]
+		username: String,
+	},
+	Ornithe {
+		version: Option<String>,
+
+		#[clap(short, long)]
+		loader_version: Option<String>,
+
+		#[clap(short, long, default_value = "10G")]
+		mem: String,
+
+		#[clap(short, long, default_value = "Player")]
+		username: String,
+	},
     Quilt {
         version: Option<String>,
 

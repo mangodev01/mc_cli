@@ -1,81 +1,105 @@
 #![allow(dead_code, unused_variables)]
 mod version;
 mod app;
-mod vanilla;
 mod mem;
-mod fabric;
 mod util;
 mod rules;
 mod assets;
+
+mod vanilla;
+mod fabric;
 mod liteloader;
+mod loaders;
 
 use app::OpenTarget;
 use clap::Parser;
 use cli_table::{Cell as _, Table};
 use directories::ProjectDirs;
 use indicatif::MultiProgress;
-use version::UseQuilt;
+use version::FabricBase;
 
 use crate::app::Subcommand;
 
 #[tokio::main]
 async fn main() {
     let app = app::App::parse();
-    let dirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
-    let game_dir = dirs.data_dir().join("game");
+
+    let pdirs = ProjectDirs::from("me", "illia", "mc_cli").unwrap();
+	let launcher_dir = pdirs.data_dir();
+
+    let dirs = util::LauncherDirs { 
+		root_dir: launcher_dir.to_path_buf(),
+		game_dir: launcher_dir.join("game"),
+		assets_dir: launcher_dir.join("assets"),
+		vers_dir: launcher_dir.join("vers") 
+	};
+
     let mp = MultiProgress::new();
 
     match app.command {
         Subcommand::Vanilla { version, mem, username } => {
-            vanilla::handle(&mp, version, mem, true, None, username).await;
+            vanilla::handle(&mp, version, mem, true, None, username, false).await;
         },
+		Subcommand::Javaagent { version, mem, username } => {
+            vanilla::handle(&mp, version, mem, true, None, username, true).await;
+		},
         Subcommand::Fabric { version, loader_version, mem, username } => {
-            fabric::handle(&mp, version, loader_version, mem, UseQuilt::No, username).await;
+            fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Fabric, username, false).await;
         },
+		Subcommand::Labric { version, loader_version, mem, username } => {
+			fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Labric, username, false).await;
+		},
+		Subcommand::Babric { loader_version, mem, username } => {
+			fabric::handle(dirs, &mp, None, loader_version, mem, FabricBase::Babric, username, false).await;
+		},
+		Subcommand::Ornithe { version, loader_version, mem, username } => {
+			fabric::handle(dirs, &mp, None, loader_version, mem, FabricBase::Ornithe, username, false).await;
+		},
         Subcommand::Quilt { version, loader_version, mem, use_release, username } => {
-            fabric::handle(&mp, version, loader_version, mem, UseQuilt::Yes(use_release), username).await;
+            fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Quilt(use_release), username, false).await;
         },
         Subcommand::Liteloader { version, loader_version, mem, username } => {
-            eprintln!("Liteloader isn't implemented yet. Please consider using fabric,quilt,or just running vanilla");
-            liteloader::handle(&mp, version, loader_version, mem, username).await;
+			unimplemented!();
+
+            //liteloader::handle(&mp, version, loader_version, mem, username, false).await;
         },
         Subcommand::Open { target: OpenTarget::Game } => {
-            open::that(game_dir).unwrap();
+            open::that(dirs.game_dir).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Mods } => {
-            let path = game_dir.join("mods");
+            let path = dirs.game_dir.join("mods");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::ResourcePacks } => {
-            let path = game_dir.join("resourcepacks");
+            let path = dirs.game_dir.join("resourcepacks");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Saves } => {
-            let path = game_dir.join("saves");
+            let path = dirs.game_dir.join("saves");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Logs } => {
-            let path = game_dir.join("logs");
+            let path = dirs.game_dir.join("logs");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Downloads } => {
-            let path = game_dir.join("downloads");
+            let path = dirs.game_dir.join("downloads");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Data } => {
-            let path = game_dir.join("data");
+            let path = dirs.game_dir.join("data");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::Config } => {
-            let path = game_dir.join("config");
+            let path = dirs.game_dir.join("config");
             open::that(path).unwrap();
         },
         Subcommand::Open { target: OpenTarget::McOptions } => {
-            let path = game_dir.join("options.txt");
+            let path = dirs.game_dir.join("options.txt");
             open::that(path).unwrap();
         },
         Subcommand::Versions => {
-            let path = dirs.data_dir().join("vers");
+            let path = dirs.vers_dir;
 
             println!("Installed versions:");
 

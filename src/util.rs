@@ -3,6 +3,13 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use futures_util::StreamExt as _;
 
+pub struct LauncherDirs {
+	pub root_dir: PathBuf,
+	pub game_dir: PathBuf,
+	pub assets_dir: PathBuf,
+	pub vers_dir: PathBuf
+}
+
 pub fn download_text(mp: &MultiProgress, url: &str, out: &Path, msg: String) -> Result<String, Box<dyn Error>> {
     let client = Client::new();
     let mut resp = client.get(url).send()?;

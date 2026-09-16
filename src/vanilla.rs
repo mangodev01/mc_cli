@@ -52,7 +52,7 @@ pub async fn get_manifest(mp: &MultiProgress) -> VanillaManifest {
     serde_json::from_str(&manifest_txt).unwrap()
 }
 
-pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: String) {
+pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: String, javaagent: bool) {
     let game_dir = version_dir
         .parent()
         .unwrap()
@@ -68,6 +68,9 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: 
     let libs = version_dir.join("libs");
 
     let mut classpath_paths = util::list_files_recursively(&libs);
+    classpath_paths.retain(|p| {
+        matches!(p.extension().and_then(|e| e.to_str()), Some("jar" | "zip"))
+    });
     classpath_paths.push(version_dir.join("client.jar"));
     let classpath = if std::env::consts::OS == "windows" {
         classpath_paths
@@ -84,6 +87,24 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: 
     };
 
     let mut jvm_args: Vec<String> = vec![format!("-Xmx{}", limit)];
+
+	if javaagent {
+		let dir = std::fs::read_dir(game_dir.join("mods"));
+
+		if let Ok(dir) = dir {
+			for f in dir {
+				if let Ok(f) = f {
+					if f.path().extension().is_some_and(|ext| ext == "jar") {
+						let agent = format!("-javaagent:{}", f.path().display());
+
+						jvm_args.push(agent);
+					}
+				}
+			}
+		} else if let Err(e) = dir {
+			eprintln!("there was an error while reading mods from mods dir: {e}");
+		}
+	}
 
     if let Some(arguments) = json.arguments.clone() {
         for arg in arguments.jvm {
@@ -219,11 +240,12 @@ pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
     let _ = fs::create_dir_all(vers.clone());
     let _ = fs::create_dir(ver.clone());
     let _ = fs::create_dir(vers.parent().unwrap().join("game"));
+    let _ = fs::create_dir(vers.parent().unwrap().join("game").join("mods"));
     let _ = fs::create_dir(ver.join("libs"));
     let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
 }
 
-pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String) {
+pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String, javaagent: bool) {
     mem::check_if_valid(limit.clone());
 
     let manifest = get_manifest(mp).await;
@@ -253,7 +275,7 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: Stri
             };
 
             if b_launch {
-                launch(version_json, ver.to_path_buf(), limit.clone(), username);
+                launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent);
             }
 
             return;
@@ -393,10 +415,9 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: Stri
 
             match tokio::time::timeout(
                 tokio::time::Duration::from_secs(60),
-                util::download_async(&mp_clone, &url, &destination, "Downloaded resource".to_owned())
+                util::download_async(&mp_clone, &url, &destination, "Done".to_owned())
             ).await {
                 Ok(Ok(_)) => {
-                    println!("Successfully downloaded resource {}", hash);
                     Ok(hash)
                 },
                 Ok(Err(e)) => {
@@ -414,6 +435,6 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: Stri
     futures_util::future::join_all(download_futures).await;
 
     if b_launch {
-        launch(version_json, ver.to_path_buf(), limit.clone(), username);
+        launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent);
     }
 }
