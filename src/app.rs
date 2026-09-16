@@ -10,7 +10,6 @@ pub struct App {
 #[derive(clap::Subcommand, Debug)]
 pub enum Subcommand {
     Vanilla {
-        #[clap(short, long)]
         version: Option<String>,
 
         #[clap(short, long, default_value = "10G")]
@@ -20,7 +19,6 @@ pub enum Subcommand {
         username: String,
     },
     Fabric {
-        #[clap(short, long)]
         version: Option<String>,
 
         #[clap(short, long)]
@@ -33,7 +31,6 @@ pub enum Subcommand {
         username: String,
     },
     Quilt {
-        #[clap(short, long)]
         version: Option<String>,
 
         #[clap(short, long)]
@@ -49,7 +46,6 @@ pub enum Subcommand {
         username: String,
     },
     Liteloader {
-        #[clap(short, long)]
         version: Option<String>,
 
         #[clap(short, long)]
