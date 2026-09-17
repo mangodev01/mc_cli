@@ -52,7 +52,7 @@ pub async fn get_manifest(mp: &MultiProgress) -> VanillaManifest {
     serde_json::from_str(&manifest_txt).unwrap()
 }
 
-pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: String, javaagent: bool) {
+pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: String, javaagent: bool, liteloader: bool) {
     let game_dir = version_dir
         .parent()
         .unwrap()
@@ -184,6 +184,11 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: 
         game_args.extend(args);
     }
 
+	if liteloader {
+		game_args.push("--tweakClass".to_string());
+		game_args.push("com.mumfrey.liteloader.launch.LiteLoaderTweaker".to_string());
+	}
+
     let game_args_resolved: Vec<String> = game_args
         .into_iter()
         .map(|arg| {
@@ -212,7 +217,11 @@ pub fn launch(json: VersionJson, version_dir: PathBuf, limit: String, username: 
 
     let mut cmd: Vec<String> = vec![];
     cmd.extend(jvm_args_resolved);
-    cmd.push(json.mainClass);
+    if liteloader {
+        cmd.push("net.minecraft.launchwrapper.Launch".to_owned());
+    } else {
+        cmd.push(json.mainClass);
+    }
     cmd.extend(game_args_resolved);
 
     println!("cmd: {:?}", cmd);
@@ -245,7 +254,7 @@ pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
     let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
 }
 
-pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String, javaagent: bool) {
+pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: String, b_launch: bool, version_dir: Option<&Path>, username: String, javaagent: bool, liteloader: bool) {
     mem::check_if_valid(limit.clone());
 
     let manifest = get_manifest(mp).await;
@@ -275,7 +284,7 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: Stri
             };
 
             if b_launch {
-                launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent);
+                launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent, liteloader);
             }
 
             return;
@@ -435,6 +444,6 @@ pub async fn handle(mp: &MultiProgress, opt_version: Option<String>, limit: Stri
     futures_util::future::join_all(download_futures).await;
 
     if b_launch {
-        launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent);
+        launch(version_json, ver.to_path_buf(), limit.clone(), username, javaagent, liteloader);
     }
 }

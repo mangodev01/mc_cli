@@ -277,7 +277,7 @@ pub async fn handle(dirs: LauncherDirs, mp: &MultiProgress, opt_version: Option<
 
     create_dirs(vers, ver_path.clone());
 
-    vanilla::handle(mp, Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path()), username.clone(), javaagent).await;
+    vanilla::handle(mp, Some(ver.version.clone()), limit.clone(), false, Some(ver_path.as_path()), username.clone(), javaagent, false).await;
     let parsed_json = down(mp, loader, &ver, ver_path.clone(), use_quilt.clone()).await;
 
     let _ = fs::remove_dir_all(ver_path.join("libs").join("META-INF"));

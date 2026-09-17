@@ -38,10 +38,10 @@ async fn main() {
 
     match app.command {
         Subcommand::Vanilla { version, mem, username } => {
-            vanilla::handle(&mp, version, mem, true, None, username, false).await;
+            vanilla::handle(&mp, version, mem, true, None, username, false, false).await;
         },
 		Subcommand::Javaagent { version, mem, username } => {
-            vanilla::handle(&mp, version, mem, true, None, username, true).await;
+            vanilla::handle(&mp, version, mem, true, None, username, true, false).await;
 		},
         Subcommand::Fabric { version, loader_version, mem, username } => {
             fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Fabric, username, false).await;
@@ -59,9 +59,9 @@ async fn main() {
             fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Quilt(use_release), username, false).await;
         },
         Subcommand::Liteloader { version, loader_version, mem, username } => {
-			unimplemented!();
+			//unimplemented!();
 
-            //liteloader::handle(&mp, version, loader_version, mem, username, false).await;
+            liteloader::handle(&mp, version, loader_version, mem, username, false).await;
         },
         Subcommand::Open { target: OpenTarget::Game } => {
             open::that(dirs.game_dir).unwrap();
