@@ -1,4 +1,9 @@
+use std::path::Path;
+
 use clap::Parser;
+use indicatif::MultiProgress;
+
+use crate::util::LauncherDirs;
 
 #[derive(Parser, Debug)]
 #[clap(name = "mc_cli", version = "0.0.1")]
@@ -100,6 +105,15 @@ pub enum Subcommand {
         #[clap(short, long, default_value = "Player")]
         username: String,
     },
+	Risugami {
+		version: Option<String>,
+
+        #[clap(short, long, default_value = "10G")]
+        mem: String,
+
+        #[clap(short, long, default_value = "Player")]
+        username: String,
+	},
     #[command(about = "List versions")]
     Versions,
     #[command(about = "Open directories or files with the preferred application")]
@@ -130,3 +144,58 @@ pub enum OpenTarget {
     #[command(about = "Opens options.txt")]
     McOptions,
 }
+
+#[derive(Debug, Clone)]
+pub struct McCtx<'a> {
+	pub dirs: LauncherDirs,
+	pub mp: &'a MultiProgress,
+	pub opt_version: Option<String>,
+	pub opt_loader_version: Option<String>,
+	pub limit: String,
+	pub version_dir: Option<&'a Path>,
+	pub username: String,
+	pub javaagent: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct McLaunchCtx {
+	pub limit: String,
+	pub username: String,
+	pub javaagent: bool,
+	pub extra_game_args: Vec<String>,
+	pub launchwrapper: bool
+}
+
+impl<'a> McCtx<'a> {
+	pub fn into_launch(self, extra_game_args: Vec<String>, launchwrapper: bool) -> McLaunchCtx {
+		McLaunchCtx {
+			limit: self.limit,
+			username: self.username,
+			javaagent: self.javaagent,
+			extra_game_args,
+			launchwrapper,
+		}
+	}
+}
+
+pub trait McLoader<'a> {
+	async fn install(&mut self, ctx: McCtx<'a>);
+	fn launch(&self, ctx: McLaunchCtx);
+
+	fn game_versions() -> String;
+
+	fn loader_versions() -> String {
+		"".to_string()
+	}
+
+	fn intermediary_versions() -> String {
+		"".to_string()
+	}
+
+	fn maven() -> String {
+		"".to_string()
+	}
+
+	fn id() -> String;
+}
+

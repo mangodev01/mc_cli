@@ -3,22 +3,24 @@ mod version;
 mod app;
 mod mem;
 mod util;
-mod rules;
 mod assets;
 
 mod vanilla;
 mod fabric;
+mod quilt;
+mod ornithe;
+mod labric;
+mod babric;
 mod liteloader;
-mod loaders;
+mod risugami;
 
 use app::OpenTarget;
 use clap::Parser;
 use cli_table::{Cell as _, Table};
 use directories::ProjectDirs;
 use indicatif::MultiProgress;
-use version::FabricBase;
 
-use crate::app::Subcommand;
+use crate::{app::{McCtx, McLoader as _, Subcommand}, babric::schema::Babric, fabric::schema::Fabric, labric::schema::Labric, liteloader::schema::Liteloader, ornithe::schema::Ornithe, quilt::schema::Quilt, risugami::schema::Risugami, vanilla::schema::Vanilla};
 
 #[tokio::main]
 async fn main() {
@@ -38,31 +40,78 @@ async fn main() {
 
     match app.command {
         Subcommand::Vanilla { version, mem, username } => {
-            vanilla::handle(&mp, version, mem, true, None, username, false, false).await;
+			let mut vanilla = Vanilla::default();
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: None, username: username.clone(), javaagent: false };
+
+            vanilla.install(ctx.clone()).await;
+            vanilla.launch(ctx.into_launch(vec![], false));
         },
 		Subcommand::Javaagent { version, mem, username } => {
-            vanilla::handle(&mp, version, mem, true, None, username, true, false).await;
+			let mut vanilla = Vanilla::default();
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: None, username: username.clone(), javaagent: true };
+
+            vanilla.install(ctx.clone()).await;
+            vanilla.launch(ctx.into_launch(vec![], false));
 		},
         Subcommand::Fabric { version, loader_version, mem, username } => {
-            fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Fabric, username, false).await;
+			let mut fabric = Fabric::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: true };
+
+            fabric.install(ctx.clone()).await;
+            fabric.launch(ctx.into_launch(vec![], false));
         },
 		Subcommand::Labric { version, loader_version, mem, username } => {
-			fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Labric, username, false).await;
+			let mut labric = Labric::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: true };
+
+			labric.install(ctx.clone()).await;
+			labric.launch(ctx.into_launch(vec![], false));
 		},
 		Subcommand::Babric { loader_version, mem, username } => {
-			fabric::handle(dirs, &mp, None, loader_version, mem, FabricBase::Babric, username, false).await;
+			let mut babric = Babric::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: None, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: true };
+
+			babric.install(ctx.clone()).await;
+			babric.launch(ctx.into_launch(vec![], false));
 		},
 		Subcommand::Ornithe { version, loader_version, mem, username } => {
-			fabric::handle(dirs, &mp, None, loader_version, mem, FabricBase::Ornithe, username, false).await;
+			let mut ornithe = Ornithe::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: None, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: true };
+
+			ornithe.install(ctx.clone()).await;
+			ornithe.launch(ctx.into_launch(vec![], false));
 		},
         Subcommand::Quilt { version, loader_version, mem, use_release, username } => {
-            fabric::handle(dirs, &mp, version, loader_version, mem, FabricBase::Quilt(use_release), username, false).await;
+			let mut quilt = Quilt::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: None, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: true };
+
+			quilt.install(ctx.clone()).await;
+			quilt.launch(ctx.into_launch(vec![], false));
         },
         Subcommand::Liteloader { version, loader_version, mem, username } => {
-			//unimplemented!();
+			let mut liteloader = Liteloader::default();
 
-            liteloader::handle(&mp, version, loader_version, mem, username, false).await;
-        },
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: loader_version, username: username.clone(), javaagent: false };
+
+			liteloader.install(ctx.clone()).await;
+			liteloader.launch(ctx.into_launch(vec![
+				"--tweakClass".to_string(),
+				"com.mumfrey.liteloader.launch.LiteLoaderTweaker".to_string(),
+			], true));
+		},
+		Subcommand::Risugami { version, mem, username } => {
+			let mut risugami = Risugami::default();
+
+			let ctx = McCtx { dirs, mp: &mp, opt_version: version, limit: mem.clone(), version_dir: None, opt_loader_version: None, username: username.clone(), javaagent: false };
+
+			risugami.install(ctx.clone()).await;
+			risugami.launch(ctx.into_launch(vec![], true));
+		},
         Subcommand::Open { target: OpenTarget::Game } => {
             open::that(dirs.game_dir).unwrap();
         },
@@ -105,8 +154,8 @@ async fn main() {
 
             let mut rows = vec![
                 vec![
-                    "TYPE".cell(),
-                    "NAME".cell()
+                    "type".cell(),
+                    "name".cell()
                 ]
             ];
 
@@ -121,6 +170,14 @@ async fn main() {
                     ("liteloader", "liteloader")
                 } else if fname.starts_with("quilt-") {
                     ("quilt", "quilt")
+				} else if fname.starts_with("risugami-") {
+					("risugami", "risugami")
+				} else if fname.starts_with("ornithe-") {
+					("ornithe", "ornithe")
+				} else if fname.starts_with("babric-") {
+					("babric", "babric")
+				} else if fname.starts_with("labric-") {
+					("legacy_fabric", "legacy_fabric")
                 } else {
                     ("vanilla", "vanilla")
                 };

@@ -3,6 +3,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use reqwest::blocking::Client;
 use futures_util::StreamExt as _;
 
+#[derive(Debug, Clone)]
 pub struct LauncherDirs {
 	pub root_dir: PathBuf,
 	pub game_dir: PathBuf,
@@ -237,5 +238,62 @@ pub fn list_files_recursively(dir: &Path) -> Vec<PathBuf> {
         }
     }
     files
+}
+
+const MCPHACKERS_LAUNCHWRAPPER: &[(&str, &str)] = &[
+    (
+        "org/mcphackers/launchwrapper/1.3.0/launchwrapper-1.3.0.jar",
+        "https://maven.glass-launcher.net/releases/org/mcphackers/launchwrapper/1.3.0/launchwrapper-1.3.0.jar",
+    ),
+    (
+        "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+        "https://maven.fabricmc.net/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+    ),
+    (
+        "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+        "https://maven.fabricmc.net/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+    ),
+    (
+        "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+        "https://maven.fabricmc.net/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+    ),
+    (
+        "org/json/json/20230311/json-20230311.jar",
+        "https://mcphackers.org/libraries/org/json/json/20230311/json-20230311.jar",
+    ),
+];
+
+pub async fn download_mcphackers_launchwrapper(mp: &MultiProgress, libs_dir: &Path) {
+    for (path, url) in MCPHACKERS_LAUNCHWRAPPER {
+        let dest = libs_dir.join(path);
+        if dest.exists() {
+            continue;
+        }
+
+        let _ = fs::create_dir_all(dest.parent().unwrap());
+        match download_async(mp, url, &dest, "Downloaded launchwrapper jar".to_owned()).await {
+            Ok(bytes) if !bytes.is_empty() => {
+                println!("Downloaded {}", path);
+            }
+            _ => {
+                let _ = fs::remove_file(&dest);
+                eprintln!("Failed to download {}", path);
+            }
+        }
+    }
+
+    let _ = fs::remove_dir_all(libs_dir.join("net/minecraft/launchwrapper"));
+}
+
+
+pub fn create_dirs(vers: PathBuf, ver: PathBuf) {
+    let _ = fs::create_dir_all(vers.clone());
+    let _ = fs::create_dir(ver.clone());
+    let _ = fs::create_dir(vers.parent().unwrap().join("game"));
+    let _ = fs::create_dir(vers.parent().unwrap().join("game").join("mods"));
+    let _ = fs::create_dir(ver.join("libs"));
+    let _ = fs::create_dir(vers.parent().unwrap().join("assets"));
+	let _ = fs::create_dir(vers.parent().unwrap().join("assets").join("objects"));
+	let _ = fs::create_dir(vers.parent().unwrap().join("assets").join("indexes"));
 }
 

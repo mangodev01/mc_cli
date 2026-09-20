@@ -1,4 +1,19 @@
-- [x] implement liteloader support by downloading the neccessary files from the jenkins.liteloader.com domain, and runnign it (not for self -- the version object contains all this information and more!!!)
+# modloaders
+- [x] liteloader
+- [x] javaagent
+- [x] nilloader (javaagent in disguise)
+- [x] ornithe
+- [x] legacy fabric ('labric')
+- [x] babric
+- [x] quilt
+- [ ] rift
+- [ ] f*rge
+- [ ] neof*rge
+- [ ] ornithe-quilt
+- [ ] more modloader support: rift, forge, neoforge, ornithe-quilt
+
+- [x] refactor so its actually maintainable
 - [ ] java installatiinot managemnt
-- [ ] more modlaoder support
-- [ ] ornithe QUILT support not just ornithe FABRIC
+- [ ] .mrpack support
+- [ ] ms auth (see mr src)
+- [ ] config option for gamedirs to be in the verdirs, unsure tho
