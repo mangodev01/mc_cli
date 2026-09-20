@@ -27,6 +27,10 @@ pub fn get_ver(versions: Vec<FabricVersion>, version: String) -> FabricVersion {
 }
 
 pub async fn down_intermediary(mp: &MultiProgress, loader: &FabricLoaderVersion, version: &FabricVersion, ver: PathBuf) {
+	if ver.join("inter.jar").exists() {
+		return;
+	}
+
     let intermediary_versions_text = util::download_text_no_save_async(
 		mp,
 		&Fabric::intermediary_versions(),

@@ -13,14 +13,19 @@ mod labric;
 mod babric;
 mod liteloader;
 mod risugami;
+mod mrpack;
+
+use std::io::{BufRead as _, Cursor, Read};
 
 use app::OpenTarget;
+use byteorder::ReadBytesExt as _;
 use clap::Parser;
 use cli_table::{Cell as _, Table};
 use directories::ProjectDirs;
 use indicatif::MultiProgress;
+use std::io::BufReader;
 
-use crate::{app::{McCtx, McLoader as _, Subcommand}, babric::schema::Babric, fabric::schema::Fabric, labric::schema::Labric, liteloader::schema::Liteloader, ornithe::schema::Ornithe, quilt::schema::Quilt, risugami::schema::Risugami, vanilla::schema::Vanilla};
+use crate::{app::{McCtx, McLoader as _, Subcommand}, babric::schema::Babric, fabric::schema::Fabric, labric::schema::Labric, liteloader::schema::Liteloader, mrpack::{MrpackIndexJson, SideType}, ornithe::schema::Ornithe, quilt::schema::Quilt, risugami::schema::Risugami, vanilla::schema::Vanilla};
 
 #[tokio::main]
 async fn main() {
@@ -111,6 +116,123 @@ async fn main() {
 
 			risugami.install(ctx.clone()).await;
 			risugami.launch(ctx.into_launch(vec![], true));
+		},
+		Subcommand::Install { mrpack } => {
+			let contents = match std::fs::read(mrpack) {
+				Ok(mrpack) => mrpack,
+				Err(e) => {
+					eprintln!("error while trying to read mrpack: {e}");
+					std::process::exit(-1);
+				}
+			};
+
+			let cur = Cursor::new(contents);
+
+			let mut archive = match zip::ZipArchive::new(cur) {
+				Ok(archive) => archive,
+				Err(e) => {
+					eprintln!("error while trying to read mrpack as zip: {e}");
+					std::process::exit(-1);
+				}
+			};
+
+			let mut index = match archive.by_name("modrinth.index.json") {
+				Ok(index) => index,
+				Err(e) => {
+					eprintln!("no modrinth.index.json found in mrpack: {e}");
+					std::process::exit(-1);
+				}
+			};
+
+			let mut index_json = String::new();
+
+			match index.read_to_string(&mut index_json) {
+				Err(e) => {
+					eprintln!("failed to read modrinth.index.json from mrpack: {e}");
+					std::process::exit(-1);
+				},
+				_ => {}
+			};
+
+            let parsed: MrpackIndexJson = match serde_json::from_str(&index_json) {
+                Ok(x) => x,
+                Err(e) => {
+					eprintln!("failed to parse modrinth.index.json: {e}");
+					std::process::exit(-1);
+                }
+            };
+
+            if parsed.game != "minecraft" {
+                eprintln!("non-minecraft modpacks unsupported");
+                std::process::exit(-1);
+            }
+
+            println!("are you sure you wanna install '{}' version {}?", parsed.name, parsed.version_id);
+            if let Some(summary) = parsed.summary {
+                println!("[{}]", summary);
+            }
+
+			let all = parsed.files
+				.iter()
+				.map(|file| {
+					let dependencies = file
+						.dependencies
+						.iter()
+						.map(|(name, version)| format!("{name}@{version}"))
+						.collect::<Vec<_>>()
+						.join(", ");
+
+					format!("{} [{}]", file.path, dependencies)
+				})
+				.collect::<Vec<_>>();
+
+			for f in all {
+				let mods = f
+					.strip_prefix("mods/").unwrap_or(&f);
+
+				let res = &mods
+					.strip_prefix("resourcepacks/").unwrap_or(&mods);
+
+				println!("| {}", res);
+			}
+
+            println!("> [Y/n] ");
+
+            let mut buf = String::new();
+            let _ = std::io::stdin().read_line(&mut buf);
+
+            let lower_buf = buf.to_lowercase();
+            let buf = lower_buf.trim();
+
+            if buf == "yes" || buf == "y" || buf == "yea" || buf == "ye" || buf == "" {
+                for file in parsed.files {
+
+                    if file.env.client == SideType::Unsupported {
+						println!("skipping {} - unsupported for client-side", file.path);
+						continue;
+					}
+
+                    let mut file_downloaded = false;
+
+                    for download in file.downloads {
+						let res = match util::download_async(&mp, &download, &dirs.game_dir.join(&file.path), format!("downloaded {}", file.path)).await {
+                            Ok(res) => {
+                                file_downloaded = true;
+                                res
+                            },
+                            Err(_) => continue
+						};
+                    }
+
+                    if !file_downloaded {
+                        eprintln!("failed to download file {}, terminating...", file.path);
+                        std::process::exit(-1);
+                    }
+                }
+            } else {
+                eprintln!("cancelled modpack installation, terminating");
+                std::process::exit(-1);
+            }
 		},
         Subcommand::Open { target: OpenTarget::Game } => {
             open::that(dirs.game_dir).unwrap();

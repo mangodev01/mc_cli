@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use indicatif::MultiProgress;
@@ -113,6 +113,10 @@ pub enum Subcommand {
 
         #[clap(short, long, default_value = "Player")]
         username: String,
+	},
+	#[command(about = "Install a modpack from an .mrpack")]
+	Install {
+		mrpack: PathBuf
 	},
     #[command(about = "List versions")]
     Versions,
